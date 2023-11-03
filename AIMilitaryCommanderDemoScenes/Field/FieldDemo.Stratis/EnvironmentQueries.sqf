@@ -64,12 +64,22 @@ SCM_fnc_getSquadCondition = {
 			
 	};
 
-	//Gets the enemy targets from squad leader
+	//Gets the enemy targets from squad leader and returns [Soldier/Vehicle, Type of Solider/Vehicle, [X pos, Y pos]]
 	SCM_fnc_TargetsQuery = {
 		_allTargets = [];
 		_targets = leader controlSquad targetsQuery[objNull, east, "", [], 0];
 		_allTargets append _targets;
-		systemChat format ["The targets are: %1", _allTargets];
+		_formattedTargets = [];
+		{
+			_targetObject = _x select 1;
+			_targetClass = typeOf _targetObject;
+			_targetType = _targetClass call BIS_fnc_objectType;
+			_formattedTarget = _targetType;
+			_targetPosition = _x select 4;
+			_formattedTarget pushBack _targetPosition;
+			_formattedTargets pushBack _formattedTarget;
+		}forEach _allTargets;
+		_formattedTargets;
 	};
 
 //Calls all queries
