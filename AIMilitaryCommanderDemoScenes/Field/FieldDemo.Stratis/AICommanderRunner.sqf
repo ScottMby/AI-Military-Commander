@@ -1,4 +1,9 @@
-//Run this for each squad that is used within the configuration:
-[] execVM "EnvironmentQueries.sqf";
+//Configurations for AI Commander.
+_aiSide = west; //Change to side you want AI to play as
 
-//Add configuration such as what side to play on, bases, squads, and supports.
+
+//Run queries for every squad on the blufor side
+{
+	//systemChat format ["%1", _x];
+	[_x] execVM "EnvironmentQueries.sqf";
+}forEach groups west;
