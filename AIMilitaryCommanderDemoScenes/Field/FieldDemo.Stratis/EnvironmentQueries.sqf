@@ -1,4 +1,4 @@
-params["_controlSquad"];
+params["_controlSquad", "_pollingRate"];
 
 _controlSquad = _controlSquad;
 //Initialize any boolean variables
@@ -150,4 +150,4 @@ SCM_fnc_queryLoop = {
 };
 
 //Calls query loop every two seconds
-[SCM_fnc_queryLoop, 2, _controlSquad] call CBA_fnc_addPerFrameHandler;
+[SCM_fnc_queryLoop, _pollingRate, _controlSquad] call CBA_fnc_addPerFrameHandler;
