@@ -83,7 +83,7 @@ _aiSide = missionNamespace getVariable "_aiSide";
 			_unitsAlive = [_x, _unitsAlive] call SCM_fnc_checkAlive;
 			_unitsInjured = [_x] call SCM_fnc_getDamage;
 			_groupMagazines = [_x] call SCM_fnc_getMagazines;
-			_groupEquipment = [_x, _groupEquipment] call SCM_fnc_sqaudEquipment;
+			_groupEquipment = [_x, _groupEquipment] call SCM_fnc_squadEquipment;
 			//Divide by the amount of squad members alive
 			
 		} forEach units _controlSquad;
@@ -121,7 +121,7 @@ _aiSide = missionNamespace getVariable "_aiSide";
 	};
 
 	//Queries for specific classes within the squad in order to know what equipment is avaiable to them.
-	SCM_fnc_sqaudEquipment = {
+	SCM_fnc_squadEquipment = {
 		params ["_x", "_unitEquipment"];
 		_launcherAT = ["ACE_launch_NLAW_ready_F", "launch_RPG32_green_F", "launch_RPG32_ghex_F", "launch_RPG32_F", "launch_RPG7_F", "launch_O_Titan_short_F" , "launch_I_Titan_short_F", "launch_O_Titan_short_ghex_F", "launch_launch_B_Titan_short_F", "launch_B_Titan_short_tna_F", "launch_MRAWS_green_rail_F", "launch_MRAWS_olive_rail_F", "launch_MRAWS_sand_rail_F", "launch_MRAWS_green_F", "launch_MRAWS_olive_F", "launch_MRAWS_sand_F", "launch_O_Vorona_brown_F", "launch_O_Vorona_green_F"];
 		_launcherAA = ["launch_I_Titan_F","launch_O_Titan_F", "launch_O_Titan_ghex_F", "launch_I_Titan_eaf_F", "launch_B_Titan_F", "launch_B_Titan_olive_F", "launch_B_Titan_tna_F"];
@@ -160,7 +160,7 @@ _aiSide = missionNamespace getVariable "_aiSide";
 
 	//Returns the list of bases that a squad knows about.
 	SCM_squadBaseKnowledge = {
-		params["_bases", "_knownBases", "_controlSquad", "_sqaudTargets"];
+		params["_bases", "_knownBases", "_controlSquad", "_squadTargets"];
 		index = 0;
 		{
 			if(_x select 1 == side _controlSquad) then 
@@ -184,8 +184,9 @@ _aiSide = missionNamespace getVariable "_aiSide";
 					if(_targetPositionAGL inArea _trigger) then {
 						_knownBases pushBack _y;
 						_bases deleteAt index;
+						break;
 					};
-				} forEach _sqaudTargets
+				} forEach _squadTargets
 			};
 			index = index + 1;
 		} forEach _bases;
@@ -204,9 +205,9 @@ _aiSide = missionNamespace getVariable "_aiSide";
 		_bases = _controlSquad getVariable "_bases";
 
 		[_controlSquad] call SCM_fnc_getSquadInformation;
-		_sqaudTargets = [_controlSquad] call SCM_fnc_targetsQuery;
+		_squadTargets = [_controlSquad] call SCM_fnc_targetsQuery;
 
-		_knownBases = [_bases, _knownBases, _controlSquad, _sqaudTargets] call SCM_squadBaseKnowledge;
+		_knownBases = [_bases, _knownBases, _controlSquad, _squadTargets] call SCM_squadBaseKnowledge;
 		
 
 		_squadSuppressed = _controlSquad getVariable "_isSuppressed";
