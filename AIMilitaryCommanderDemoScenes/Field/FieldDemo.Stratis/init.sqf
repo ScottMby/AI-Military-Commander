@@ -3,5 +3,3 @@
     waitUntil {time > 1};
 	[] execVM "AICommanderRunner.sqf";
 }
-
- 

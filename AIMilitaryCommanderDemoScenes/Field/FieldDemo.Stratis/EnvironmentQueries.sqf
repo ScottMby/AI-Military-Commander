@@ -15,14 +15,13 @@ _aiSide = missionNamespace getVariable "_aiSide";
 			_triggerActivation = triggerActivation _x;
 			if (_triggerActivation select 0 == "WEST") then
 			{
-				_bases pushBack [_x, west];
+				_bases pushBack [_x, west, [], false];
 			};
 			if (_triggerActivation select 0 == "EAST") then
 			{
-				_bases pushBack [_x, east];
+				_bases pushBack [_x, east, [], false];
 			};
 		} forEach _baseTriggers;
-		//systemChat format ["%1", _bases];
 		_bases;
 	};
 
@@ -117,7 +116,8 @@ _aiSide = missionNamespace getVariable "_aiSide";
 			_formattedTargets pushBack _formattedTarget;
 		}forEach _allTargets;
 		//systemChat format ["%1", _formattedTargets];
-		_formattedTargets;
+		_controlSquad setVariable ["_squadTargets", _formattedTargets];
+		_targets;
 	};
 
 	//Queries for specific classes within the squad in order to know what equipment is avaiable to them.
@@ -158,40 +158,46 @@ _aiSide = missionNamespace getVariable "_aiSide";
 		//Sniper could be implemented by checking if each unit has a sniper/marksman rifle similar to how we check for AT or AA.
 	};
 
-	//Returns the list of bases that a squad knows about.
+	//Returns the list of bases that a squad knows about. Format is [base name, side, targets array, knows about].
 	SCM_squadBaseKnowledge = {
-		params["_bases", "_knownBases", "_controlSquad", "_squadTargets"];
+		params["_bases", "_knownBases", "_controlSquad", "_targetObjects"];
+		_knownBases = [];
 		index = 0;
 		{
 			if(_x select 1 == side _controlSquad) then 
 			{
-				_knownBases pushBack _x;
-				_bases deleteAt index;
+				_knownBases pushBack [_x select 0, west, [], true];
 			}
 			else
 			{
-				_y = _x; //So we can access both itterated elements.
+				_y = _x select 0; //So we can access both itterated elements.
 
 				//We have several approches here to check whether any of our units have seen an enemy base. 
 				//This implementation checks if the squad see any targets in base areas.
 				//If the targets are in the base areas, we will assunme that the squad also saw the base.
-				{
-					_trigger = _y select 0;
-					_targetPosition = _x select 2;
-					_targetPosition pushBack getTerrainHeightASL _targetPosition;
-					_targetPositionAGL = ASLToAGL _targetPosition;
 
-					if(_targetPositionAGL inArea _trigger) then {
-						_knownBases pushBack _y;
-						_bases deleteAt index;
-						break;
+				_baseTargets = []; //targets within base
+				{
+					_trigger = _y;
+					_target = _x select 1;
+					if(_target inArea _trigger) then {
+						_baseTargets pushBack _x;
 					};
-				} forEach _squadTargets
+				} forEach _targetObjects;
+
+				if(count _baseTargets > 0) then
+				{
+					_knownBases pushBack [_y, east, _baseTargets, true];
+				}
+				else{
+					_currentBase = _bases select index;
+					_knownBases pushBack [_y, east, [], _currentBase select 3];
+				};
 			};
 			index = index + 1;
 		} forEach _bases;
-		_controlSquad setVariable ["_bases", _bases];
-		//systemChat format ["%1", _knownBases];
+		_controlSquad setVariable ["_bases", _knownBases];
+		systemChat format ["%1", _knownBases];
 		_knownBases;
 	};
 
@@ -205,10 +211,10 @@ _aiSide = missionNamespace getVariable "_aiSide";
 		_bases = _controlSquad getVariable "_bases";
 
 		[_controlSquad] call SCM_fnc_getSquadInformation;
-		_squadTargets = [_controlSquad] call SCM_fnc_targetsQuery;
+		_targetObjects = [_controlSquad] call SCM_fnc_targetsQuery;
 
-		_knownBases = [_bases, _knownBases, _controlSquad, _squadTargets] call SCM_squadBaseKnowledge;
-		
+		_knownBases = [_bases, _knownBases, _controlSquad, _targetObjects] call SCM_squadBaseKnowledge;
+
 
 		_squadSuppressed = _controlSquad getVariable "_isSuppressed";
 		_unitsAlive = _controlSquad getVariable "_unitsAlive";
