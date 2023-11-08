@@ -1,19 +1,48 @@
-params["_controlSquad", "_pollingRate"];
+_aiSide = missionNamespace getVariable "_aiSide";
 
-_controlSquad = _controlSquad;
-//Initialize any boolean variables
-_controlSquad setVariable ["_isSuppressed", false];
-
-//Sets up event handlers
+//Run for every squad on the AI's Side
 {
-	_x addEventHandler ["Suppressed", {
-				params ["_unit", "_firer", "_distance", "_weapon", "_muzzle", "_mode", "_ammo", "_gunner"];
-				group _x setVariable ["_isSuppressed", true];
-			}];
-} forEach units _controlSquad;
+	_pollingRate = missionNamespace getVariable "_pollingRate";
+	_baseTriggers = missionNamespace getVariable "_baseTriggers";
 
-//Queries the squads condition, equipment etc...
-SCM_fnc_getSquadInformation = {
+	_controlSquad = _x;
+
+	//Returns trigger of a base along with its side.
+	SCM_fnc_getBases = {
+		params["_baseTriggers"];
+		_bases = [];
+		{
+			_triggerActivation = triggerActivation _x;
+			if (_triggerActivation select 0 == "WEST") then
+			{
+				_bases pushBack [_x, west];
+			};
+			if (_triggerActivation select 0 == "EAST") then
+			{
+				_bases pushBack [_x, east];
+			};
+		} forEach _baseTriggers;
+		//systemChat format ["%1", _bases];
+		_bases;
+	};
+
+	//Add bases that have been configured
+	_controlSquad setVariable ["_bases", [_baseTriggers] call SCM_fnc_getBases];
+
+	//Initialize any variables
+	_controlSquad setVariable ["_isSuppressed", false];
+	_knownBases = [];
+
+	//Sets up event handlers
+	{
+		_x addEventHandler ["Suppressed", {
+					params ["_unit", "_firer", "_distance", "_weapon", "_muzzle", "_mode", "_ammo", "_gunner"];
+					group _x setVariable ["_isSuppressed", true];
+				}];
+	} forEach units _controlSquad;
+
+	//Queries the squads condition, equipment etc...
+	SCM_fnc_getSquadInformation = {
 		params["_controlSquad"];
 
 		//Checks the amount of squad members alive
@@ -65,10 +94,10 @@ SCM_fnc_getSquadInformation = {
 			_groupMagazines = _groupMagazines / _unitsAlive;
 		};
 
-			_controlSquad setVariable ["_unitsAlive", _unitsAlive];
-			_controlSquad setVariable ["_unitsInjured", _unitsInjured];
-			_controlSquad setVariable ["_groupMagazines", _groupMagazines];
-			_controlSquad setVariable ["_groupEquipment", _groupEquipment];
+		_controlSquad setVariable ["_unitsAlive", _unitsAlive];
+		_controlSquad setVariable ["_unitsInjured", _unitsInjured];
+		_controlSquad setVariable ["_groupMagazines", _groupMagazines];
+		_controlSquad setVariable ["_groupEquipment", _groupEquipment];
 	};
 
 	//Gets the enemy targets from squad leader and returns [Soldier/Vehicle, Type of Solider/Vehicle, [X pos, Y pos]]
@@ -125,29 +154,76 @@ SCM_fnc_getSquadInformation = {
 			_unitEquipment pushBack "MEDIC";
 		};
 		_unitEquipment;
+
+		//Sniper could be implemented by checking if each unit has a sniper/marksman rifle similar to how we check for AT or AA.
 	};
 
-//Calls all queries
-SCM_fnc_queryLoop = {
-	params["_controlSquad"];
-
-	[_controlSquad] call SCM_fnc_getSquadInformation;
-	[_controlSquad] call SCM_fnc_targetsQuery;
-
-	_squadSuppressed = _controlSquad getVariable "_isSuppressed";
-	_unitsAlive = _controlSquad getVariable "_unitsAlive";
-	_unitsInjured = _controlSquad getVariable "_unitsInjured";
-	_groupMagazines = _controlSquad getVariable "_groupMagazines";
-
-	//Prints for debugging and test purposes
-		//systemChat format ["Squad: %4. There are %1 soldiers left in the squad with %2 injured soldiers. They have %3 magazines on average", _unitsAlive, _unitsInjured, _groupMagazines, _controlSquad];
-
-		if(_squadSuppressed) then 
+	//Returns the list of bases that a squad knows about.
+	SCM_squadBaseKnowledge = {
+		params["_bases", "_knownBases", "_controlSquad", "_sqaudTargets"];
+		index = 0;
 		{
-			//systemChat "squad is suppressed";
-			_controlSquad setVariable ["_isSuppressed", false];
-		}; 
-};
+			if(_x select 1 == side _controlSquad) then 
+			{
+				_knownBases pushBack _x;
+				_bases deleteAt index;
+			}
+			else
+			{
+				_y = _x; //So we can access both itterated elements.
 
-//Calls query loop every two seconds
-[SCM_fnc_queryLoop, _pollingRate, _controlSquad] call CBA_fnc_addPerFrameHandler;
+				//We have several approches here to check whether any of our units have seen an enemy base. 
+				//This implementation checks if the squad see any targets in base areas.
+				//If the targets are in the base areas, we will assunme that the squad also saw the base.
+				{
+					_trigger = _y select 0;
+					_targetPosition = _x select 2;
+					_targetPosition pushBack getTerrainHeightASL _targetPosition;
+					_targetPositionAGL = ASLToAGL _targetPosition;
+
+					if(_targetPositionAGL inArea _trigger) then {
+						_knownBases pushBack _y;
+						_bases deleteAt index;
+					};
+				} forEach _sqaudTargets
+			};
+			index = index + 1;
+		} forEach _bases;
+		_controlSquad setVariable ["_bases", _bases];
+		//systemChat format ["%1", _knownBases];
+		_knownBases;
+	};
+
+	//Calls all queries
+	SCM_fnc_queryLoop = {
+		params["_args"];
+
+		_controlSquad = _args select 0;
+		_baseTriggers = _args select 1;
+		_knownBases = _args select 2;
+		_bases = _controlSquad getVariable "_bases";
+
+		[_controlSquad] call SCM_fnc_getSquadInformation;
+		_sqaudTargets = [_controlSquad] call SCM_fnc_targetsQuery;
+
+		_knownBases = [_bases, _knownBases, _controlSquad, _sqaudTargets] call SCM_squadBaseKnowledge;
+		
+
+		_squadSuppressed = _controlSquad getVariable "_isSuppressed";
+		_unitsAlive = _controlSquad getVariable "_unitsAlive";
+		_unitsInjured = _controlSquad getVariable "_unitsInjured";
+		_groupMagazines = _controlSquad getVariable "_groupMagazines";
+
+		//Prints for debugging and test purposes
+			//systemChat format ["Squad: %4. There are %1 soldiers left in the squad with %2 injured soldiers. They have %3 magazines on average", _unitsAlive, _unitsInjured, _groupMagazines, _controlSquad];
+
+			if(_squadSuppressed) then 
+			{
+				//systemChat "squad is suppressed";
+				_controlSquad setVariable ["_isSuppressed", false];
+			}; 
+	};
+	//Calls query loop every two seconds
+	[SCM_fnc_queryLoop, _pollingRate, [_controlSquad, _baseTriggers, _knownBases]] call CBA_fnc_addPerFrameHandler;
+
+} forEach groups _aiSide;
