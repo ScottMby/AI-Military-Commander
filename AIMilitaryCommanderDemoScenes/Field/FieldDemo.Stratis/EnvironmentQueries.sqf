@@ -125,6 +125,7 @@ _aiSide = missionNamespace getVariable "_aiSide";
 		params ["_x", "_unitEquipment"];
 		_launcherAT = ["ACE_launch_NLAW_ready_F", "launch_RPG32_green_F", "launch_RPG32_ghex_F", "launch_RPG32_F", "launch_RPG7_F", "launch_O_Titan_short_F" , "launch_I_Titan_short_F", "launch_O_Titan_short_ghex_F", "launch_launch_B_Titan_short_F", "launch_B_Titan_short_tna_F", "launch_MRAWS_green_rail_F", "launch_MRAWS_olive_rail_F", "launch_MRAWS_sand_rail_F", "launch_MRAWS_green_F", "launch_MRAWS_olive_F", "launch_MRAWS_sand_F", "launch_O_Vorona_brown_F", "launch_O_Vorona_green_F"];
 		_launcherAA = ["launch_I_Titan_F","launch_O_Titan_F", "launch_O_Titan_ghex_F", "launch_I_Titan_eaf_F", "launch_B_Titan_F", "launch_B_Titan_olive_F", "launch_B_Titan_tna_F"];
+		_sniper = "srifle";
 		if(secondaryWeapon _x in _launcherAT) then
 		{
 			_unitEquipment pushBack "AT";
@@ -153,9 +154,13 @@ _aiSide = missionNamespace getVariable "_aiSide";
 		{
 			_unitEquipment pushBack "MEDIC";
 		};
-		_unitEquipment;
 
-		//Sniper could be implemented by checking if each unit has a sniper/marksman rifle similar to how we check for AT or AA.
+		if(_sniper in primaryWeapon _x) then
+		{
+			_unitEquipment pushBack "SNIPER";
+		};
+		//systemChat format ["%1", _unitEquipment];
+		_unitEquipment;
 	};
 
 	//Returns the list of bases that a squad knows about. Format is [base name, side, targets array, knows about].
@@ -197,7 +202,7 @@ _aiSide = missionNamespace getVariable "_aiSide";
 			index = index + 1;
 		} forEach _bases;
 		_controlSquad setVariable ["_bases", _knownBases];
-		systemChat format ["%1", _knownBases];
+		//systemChat format ["%1", _knownBases];
 		_knownBases;
 	};
 
