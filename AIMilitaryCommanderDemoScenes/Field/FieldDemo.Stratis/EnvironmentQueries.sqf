@@ -7,9 +7,6 @@ _aiSide = missionNamespace getVariable "_aiSide";
 
 	_controlSquad = _x;
 
-	_controlSquad setVariable ["_priority", "MEDIUM"]; //Sets default sqaud priority
-	_controlSquad setVariable ["_currentState", "START"]; //Sets default squad state
-
 	//Returns trigger of a base along with its side.
 	SCM_fnc_getBases = {
 		params["_baseTriggers"];
@@ -27,13 +24,6 @@ _aiSide = missionNamespace getVariable "_aiSide";
 		} forEach _baseTriggers;
 		_bases;
 	};
-
-	//Add bases that have been configured
-	_controlSquad setVariable ["_bases", [_baseTriggers] call SCM_fnc_getBases];
-
-	//Initialize any variables
-	_controlSquad setVariable ["_isSuppressed", false];
-	_knownBases = [];
 
 	//Sets up event handlers
 	{
@@ -209,6 +199,17 @@ _aiSide = missionNamespace getVariable "_aiSide";
 		_knownBases;
 	};
 
+	SCM_fnc_getSquadSkill = {
+		params["_controlSquad"];	
+		_squadSkillAvg = 0;	
+		{
+			_squadSkillAvg = _squadSkillAvg + skill _x;
+		} forEach units _controlSquad;
+		_squadSkillAvg = _squadSkillAvg / count units _controlSquad;
+		systemChat format ["squad skill is %1", _squadSkillAvg];
+		_squadSkillAvg;
+	};
+
 	//Calls all queries
 	SCM_fnc_queryLoop = {
 		params["_args"];
@@ -238,6 +239,16 @@ _aiSide = missionNamespace getVariable "_aiSide";
 				_controlSquad setVariable ["_isSuppressed", false];
 			}; 
 	};
+
+	//Set squad variables
+	_controlSquad setVariable ["_bases", [_baseTriggers] call SCM_fnc_getBases]; //Add bases that have been configured
+	_controlSquad setVariable ["_priority", "MEDIUM"]; //Sets default sqaud priority
+	_controlSquad setVariable ["_currentState", "START"]; //Sets default squad state
+	_controlSquad setVariable ["_squadSkill",[_controlSquad] call SCM_fnc_getSquadSkill];
+	_controlSquad setVariable ["_isSuppressed", false];
+
+	_knownBases = [];
+
 	//Calls query loop every two seconds
 	[SCM_fnc_queryLoop, _pollingRate, [_controlSquad, _baseTriggers, _knownBases]] call CBA_fnc_addPerFrameHandler;
 
