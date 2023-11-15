@@ -7,6 +7,9 @@ _aiSide = missionNamespace getVariable "_aiSide";
 
 	_controlSquad = _x;
 
+	_controlSquad setVariable ["_priority", "MEDIUM"]; //Sets default sqaud priority
+	_controlSquad setVariable ["_currentState", "START"]; //Sets default squad state
+
 	//Returns trigger of a base along with its side.
 	SCM_fnc_getBases = {
 		params["_baseTriggers"];
