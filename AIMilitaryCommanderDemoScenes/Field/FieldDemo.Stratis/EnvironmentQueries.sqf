@@ -199,6 +199,7 @@ _aiSide = missionNamespace getVariable "_aiSide";
 		_knownBases;
 	};
 
+	//Returns average of squad skill from range of 0 to 1
 	SCM_fnc_getSquadSkill = {
 		params["_controlSquad"];	
 		_squadSkillAvg = 0;	
@@ -206,7 +207,7 @@ _aiSide = missionNamespace getVariable "_aiSide";
 			_squadSkillAvg = _squadSkillAvg + skill _x;
 		} forEach units _controlSquad;
 		_squadSkillAvg = _squadSkillAvg / count units _controlSquad;
-		systemChat format ["squad skill is %1", _squadSkillAvg];
+		//systemChat format ["squad skill is %1", _squadSkillAvg];
 		_squadSkillAvg;
 	};
 
@@ -231,13 +232,22 @@ _aiSide = missionNamespace getVariable "_aiSide";
 		_groupMagazines = _controlSquad getVariable "_groupMagazines";
 
 		//Prints for debugging and test purposes
-			//systemChat format ["Squad: %4. There are %1 soldiers left in the squad with %2 injured soldiers. They have %3 magazines on average", _unitsAlive, _unitsInjured, _groupMagazines, _controlSquad];
+		//systemChat format ["Squad: %4. There are %1 soldiers left in the squad with %2 injured soldiers. They have %3 magazines on average", _unitsAlive, _unitsInjured, _groupMagazines, _controlSquad];
 
-			if(_squadSuppressed) then 
-			{
-				//systemChat "squad is suppressed";
-				_controlSquad setVariable ["_isSuppressed", false];
-			}; 
+		if(_squadSuppressed) then 
+		{
+			//systemChat "squad is suppressed";
+			_controlSquad setVariable ["_isSuppressed", false];
+		}; 
+
+		//Returns whether the sun or moon is out from a range of 0 the moon is out and 1 the sun is out.
+		SCM_fnc_getDayOrNight = {
+			_dayOrNight = sunOrMoon;
+			//systemChat format ["the dayNight cycle is at %1", _dayOrNight];
+			_dayOrNight;
+		};
+
+		missionNamespace setVariable ["_dayOrNight", [] call SCM_fnc_getDayOrNight];
 	};
 
 	//Set squad variables
