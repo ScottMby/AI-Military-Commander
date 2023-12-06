@@ -211,6 +211,66 @@ _aiSide = missionNamespace getVariable "_aiSide";
 		_squadSkillAvg;
 	};
 
+	//Returns whether the sun or moon is out from a range of 0 the moon is out and 1 the sun is out.
+	SCM_fnc_getDayOrNight = {
+		_dayOrNight = sunOrMoon;
+		//systemChat format ["the dayNight cycle is at %1", _dayOrNight];
+		_dayOrNight;
+	};
+
+	//Takes in input value and makes them inaccurate to simulate inacurracy within information exchanged from a squad to the commander.
+	SCM_fnc_groupInaccuracies = {
+		params["_groupMagazines", "_squadSkill", "_dayOrNight"];
+
+		_groupMagazinesApprox = "null";
+
+		//mags fuzzification
+		if(_groupMagazines <= 2) then
+		{
+			_groupMagazinesApprox = "LOW";
+		};
+		if(_groupMagazines > 2 && _groupMagazines <= 7) then
+		{
+			difference = 7 - 2;
+			temp = _groupMagazines - 2;
+			low = -1/difference * temp + 1;
+			high = 1/difference * temp;
+			rndm = random 100;
+			if(rndm <= (low * 100)) then
+			{
+				_groupMagazinesApprox = "LOW";
+			}
+			else{
+				_groupMagazinesApprox = "MID";
+			}
+		};
+		if(_groupMagazines > 7 && _groupMagazines <= 10) then
+		{
+			_groupMagazinesApprox = "MID";
+		};
+		if(_groupMagazines > 10 && _groupMagazines <= 12) then
+		{
+			difference = 12 - 10;
+			temp = _groupMagazines - 10;
+			low = -1/difference * temp + 1;
+			high = 1/difference * temp;
+			rndm = random 100;
+			if(rndm <= (low * 100)) then
+			{
+				_groupMagazinesApprox = "MID";
+			}
+			else{
+				_groupMagazinesApprox = "HIGH";
+			}
+		};
+		if(_groupMagazines > 12) then
+		{
+				_groupMagazinesApprox = "HIGH";
+		};
+
+		systemChat format["group mags = %1 and %2", _groupMagazinesApprox, _groupMagazines];
+	};
+
 	//Calls all queries
 	SCM_fnc_queryLoop = {
 		params["_args"];
@@ -231,6 +291,11 @@ _aiSide = missionNamespace getVariable "_aiSide";
 		_unitsInjured = _controlSquad getVariable "_unitsInjured";
 		_groupMagazines = _controlSquad getVariable "_groupMagazines";
 
+		_squadSkill = [] call SCM_fnc_getSquadSkill;
+		_dayOrNight = [] call SCM_fnc_getDayOrNight;
+
+		[_groupMagazines, _squadSkill, _dayOrNight] call SCM_fnc_groupInaccuracies;
+
 		//Prints for debugging and test purposes
 		//systemChat format ["Squad: %4. There are %1 soldiers left in the squad with %2 injured soldiers. They have %3 magazines on average", _unitsAlive, _unitsInjured, _groupMagazines, _controlSquad];
 
@@ -240,12 +305,6 @@ _aiSide = missionNamespace getVariable "_aiSide";
 			_controlSquad setVariable ["_isSuppressed", false];
 		}; 
 
-		//Returns whether the sun or moon is out from a range of 0 the moon is out and 1 the sun is out.
-		SCM_fnc_getDayOrNight = {
-			_dayOrNight = sunOrMoon;
-			//systemChat format ["the dayNight cycle is at %1", _dayOrNight];
-			_dayOrNight;
-		};
 
 		missionNamespace setVariable ["_dayOrNight", [] call SCM_fnc_getDayOrNight];
 	};
