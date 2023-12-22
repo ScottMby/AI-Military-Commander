@@ -164,7 +164,15 @@ _aiSide = missionNamespace getVariable "_aiSide";
 		{
 			if(_x select 1 == side _controlSquad) then 
 			{
-				_knownBases pushBack [_x select 0, west, [], true];
+				_baseTargets = []; //targets within base
+				{
+					_trigger = _y;
+					_target = _x;
+					if(_target inArea _trigger) then {
+						_baseTargets pushBack _x;
+					};
+				} forEach units side _controlSquad;
+				_knownBases pushBack [_x select 0, west, _baseTargets, true];
 			}
 			else
 			{
@@ -220,55 +228,66 @@ _aiSide = missionNamespace getVariable "_aiSide";
 
 	//Takes in input value and makes them inaccurate to simulate inacurracy within information exchanged from a squad to the commander.
 	SCM_fnc_groupInaccuracies = {
-		params["_groupMagazines", "_squadSkill", "_dayOrNight"];
+		params["_groupMagazines", "_unitsInjured", "_knownBases", "_squadSkill", "_dayOrNight"];
 
-		_groupMagazinesApprox = "null";
-
-		//mags fuzzification
-		if(_groupMagazines <= 2) then
+		//fuzzification
+		_groupMagazinesApprox = [_groupMagazines, [0,2,7,10,12]] call SCM_fnc_fuzzifier;
+		_unitsInjuredApprox = [_unitsInjured, [0,1,3,4,6]] call SCM_fnc_fuzzifier;
 		{
-			_groupMagazinesApprox = "LOW";
+			targetsAtBase = _x select 2;
+			_knownBasesUnitsApprox = [count targetsAtBase, [0,5,10,15,20]] call SCM_fnc_fuzzifier;
+			_x pushBack _knownBasesUnitsApprox;
+		} forEach _knownBases;
+	};
+
+	SCM_fnc_fuzzifier = {
+		params["_fuzzyInput", "_ranges"];
+
+		_fuzzyInputApprox = "null";
+
+		if(_fuzzyInput <= _ranges select 1) then
+		{
+			_fuzzyInputApprox = "LOW";
 		};
-		if(_groupMagazines > 2 && _groupMagazines <= 7) then
+		if(_fuzzyInput > _ranges select 1 && _fuzzyInput <= _ranges select 2) then
 		{
-			difference = 7 - 2;
-			temp = _groupMagazines - 2;
+			difference = (_ranges select 2) - (_ranges select 1);
+			temp = _fuzzyInput - (_ranges select 1);
 			low = -1/difference * temp + 1;
 			high = 1/difference * temp;
 			rndm = random 100;
 			if(rndm <= (low * 100)) then
 			{
-				_groupMagazinesApprox = "LOW";
+				_fuzzyInputApprox = "LOW";
 			}
 			else{
-				_groupMagazinesApprox = "MID";
+				_fuzzyInputApprox = "MID";
 			}
 		};
-		if(_groupMagazines > 7 && _groupMagazines <= 10) then
+		if(_fuzzyInput > _ranges select 2 && _fuzzyInput <= _ranges select 3) then
 		{
-			_groupMagazinesApprox = "MID";
+			_fuzzyInputApprox = "MID";
 		};
-		if(_groupMagazines > 10 && _groupMagazines <= 12) then
+		if(_fuzzyInput > _ranges select 3 && _fuzzyInput <= _ranges select 4) then
 		{
-			difference = 12 - 10;
-			temp = _groupMagazines - 10;
+			difference = (_ranges select 4) - (_ranges select 3);
+			temp = _fuzzyInput - (_ranges select 3);
 			low = -1/difference * temp + 1;
 			high = 1/difference * temp;
 			rndm = random 100;
 			if(rndm <= (low * 100)) then
 			{
-				_groupMagazinesApprox = "MID";
+				_fuzzyInputApprox = "MID";
 			}
 			else{
-				_groupMagazinesApprox = "HIGH";
+				_fuzzyInputApprox = "HIGH";
 			}
 		};
-		if(_groupMagazines > 12) then
+		if(_fuzzyInput > _ranges select 4) then
 		{
-				_groupMagazinesApprox = "HIGH";
+				_fuzzyInputApprox = "HIGH";
 		};
-
-		systemChat format["group mags = %1 and %2", _groupMagazinesApprox, _groupMagazines];
+		_fuzzyInputApprox;
 	};
 
 	//Calls all queries
@@ -285,7 +304,6 @@ _aiSide = missionNamespace getVariable "_aiSide";
 
 		_knownBases = [_bases, _knownBases, _controlSquad, _targetObjects] call SCM_squadBaseKnowledge;
 
-
 		_squadSuppressed = _controlSquad getVariable "_isSuppressed";
 		_unitsAlive = _controlSquad getVariable "_unitsAlive";
 		_unitsInjured = _controlSquad getVariable "_unitsInjured";
@@ -294,7 +312,7 @@ _aiSide = missionNamespace getVariable "_aiSide";
 		_squadSkill = [] call SCM_fnc_getSquadSkill;
 		_dayOrNight = [] call SCM_fnc_getDayOrNight;
 
-		[_groupMagazines, _squadSkill, _dayOrNight] call SCM_fnc_groupInaccuracies;
+		[_groupMagazines, _unitsInjured, _knownBases, _squadSkill, _dayOrNight] call SCM_fnc_groupInaccuracies;
 
 		//Prints for debugging and test purposes
 		//systemChat format ["Squad: %4. There are %1 soldiers left in the squad with %2 injured soldiers. They have %3 magazines on average", _unitsAlive, _unitsInjured, _groupMagazines, _controlSquad];
