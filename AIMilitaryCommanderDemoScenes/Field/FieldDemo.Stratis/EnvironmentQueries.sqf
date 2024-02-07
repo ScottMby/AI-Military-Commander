@@ -4,6 +4,7 @@ _aiSide = missionNamespace getVariable "_aiSide";
 {
 	_pollingRate = missionNamespace getVariable "_pollingRate";
 	_baseTriggers = missionNamespace getVariable "_baseTriggers";
+	_responseTime = missionNamespace getVariable "_responseTime";
 
 	_controlSquad = _x;
 
@@ -27,9 +28,9 @@ _aiSide = missionNamespace getVariable "_aiSide";
 
 	//Sets up event handlers
 	{
-		_x addEventHandler ["Suppressed", {
+		_x addEventHandler ["FiredNear", {
 					params ["_unit", "_firer", "_distance", "_weapon", "_muzzle", "_mode", "_ammo", "_gunner"];
-					group _x setVariable ["_isSuppressed", true];
+					group _x setVariable ["_isEngaged", true];
 				}];
 	} forEach units _controlSquad;
 
@@ -61,35 +62,35 @@ _aiSide = missionNamespace getVariable "_aiSide";
 		SCM_fnc_getMagazines = {
 			params ["_x"];
 			if(alive _x) then{
-				_groupMagazines = _groupMagazines + count magazines _x;
+				_squadMagazines = _squadMagazines + count magazines _x;
 			};
-			_groupMagazines;
+			_squadMagazines;
 		};
 
 		_unitsInjured = 0;
-		_groupMagazines = 0;
-		_groupEquipment = [];
+		_squadMagazines = 0;
+		_squadEquipment = [];
 		_unitsAlive = count units _controlSquad;
 
 		{
 			_unitsAlive = [_x, _unitsAlive] call SCM_fnc_checkAlive;
 			_unitsInjured = [_x] call SCM_fnc_getDamage;
-			_groupMagazines = [_x] call SCM_fnc_getMagazines;
-			_groupEquipment = [_x, _groupEquipment] call SCM_fnc_squadEquipment;
+			_squadMagazines = [_x] call SCM_fnc_getMagazines;
+			_squadEquipment = [_x, _squadEquipment] call SCM_fnc_squadEquipment;
 			//Divide by the amount of squad members alive
 			
 		} forEach units _controlSquad;
-		//systemChat format ["%1", _groupEquipment];
+		//systemChat format ["%1", _squadEquipment];
 
 		if(_unitsAlive > 0) then
 		{
-			_groupMagazines = _groupMagazines / _unitsAlive;
+			_squadMagazines = _squadMagazines / _unitsAlive;
 		};
 
 		_controlSquad setVariable ["_unitsAlive", _unitsAlive];
 		_controlSquad setVariable ["_unitsInjured", _unitsInjured];
-		_controlSquad setVariable ["_groupMagazines", _groupMagazines];
-		_controlSquad setVariable ["_groupEquipment", _groupEquipment];
+		_controlSquad setVariable ["_squadMagazines", _squadMagazines];
+		_controlSquad setVariable ["_squadEquipment", _squadEquipment];
 	};
 
 	//Gets the enemy targets from squad leader and returns [Soldier/Vehicle, Type of Solider/Vehicle, [X pos, Y pos]]
@@ -227,27 +228,74 @@ _aiSide = missionNamespace getVariable "_aiSide";
 	};
 
 	//Takes in input value and makes them inaccurate to simulate inacurracy within information exchanged from a squad to the commander.
-	SCM_fnc_groupInaccuracies = {
-		params["_groupMagazines", "_unitsInjured", "_knownBases", "_squadSkill", "_dayOrNight"];
+	SCM_fnc_squadInaccuracies = {
+		params["_controlSquad", "_squadMagazines", "_unitsAlive", "_unitsInjured", "_knownBases", "_squadSkill", "_dayOrNight", "_squadEngaged", "_responseTime"];
+
+		_squadLeaderDown = !alive leader _controlSquad;
+		_reactionTimeMultiplier = random _responseTime;
+
+		//Uses a number of factors to calculate a misinformation multiplier that is applied to a weighted rng to calculate the chance of the squad delievering misinformation to the commander.
+		_misinformationMultiplier = (1 - _squadSkill) * 10;
+		_misinformationMultiplier = _misinformationMultiplier + (_dayOrNight * 5);
+		if(_squadLeaderDown) then
+		{
+			_misinformationMultiplier = _misinformationMultiplier + 5;
+		};
+		if(_squadEngaged) then
+		{
+			_misinformationMultiplier = _misinformationMultiplier + 5;
+		};
+
+		_misinformationMultiplier = _misinformationMultiplier / 100;
+
+		{
+
+			//Randomise whether the multiplier has a positive or negative effect.
+			_misinformationMultiplier = selectRandom [-_misinformationMultiplier, _misinformationMultiplier];
+
+			//Use a weighted RNG to randomise the chance of misinfomation while being effected by the previous factors.
+			_misinformationMultiplier = random [0.75, 1 + _misinformationMultiplier, 1.25];
+
+			_x = _x * _misinformationMultiplier;
+
+		} foreach [_squadMagazines, _unitsInjured, _unitsAlive, _reactionTimeMultiplier];
+
+		{
+
+			//Randomise whether the multiplier has a positive or negative effect.
+			_misinformationMultiplier = selectRandom [-_misinformationMultiplier, _misinformationMultiplier];
+
+			//Use a weighted RNG to randomise the chance of misinfomation while being effected by the previous factors.
+			_misinformationMultiplier = random [0.75, 1 + _misinformationMultiplier, 1.25];
+
+			_x select 4 = (_x select 4) * _misinformationMultiplier;
+
+		} foreach [_knownBases];
 
 		//fuzzification
-		_groupMagazinesApprox = [_groupMagazines, [0,2,7,10,12]] call SCM_fnc_fuzzifier;
+		_squadMagazinesApprox = [_squadMagazines, [0,2,7,10,12]] call SCM_fnc_fuzzifier;
 		_unitsInjuredApprox = [_unitsInjured, [0,1,3,4,6]] call SCM_fnc_fuzzifier;
 		{
 			targetsAtBase = _x select 2;
-			_knownBasesUnitsApprox = [count targetsAtBase, [0,5,10,15,20]] call SCM_fnc_fuzzifier;
+			_knownBasesUnitsApprox = [(count targetsAtBase), [0,5,10,15,20]] call SCM_fnc_fuzzifier;
 			_x pushBack _knownBasesUnitsApprox;
 		} forEach _knownBases;
+
+		finalValues = [_knownBases, _unitsAlive, _unitsInjuredApprox, _squadMagazinesApprox, _squadEngaged];
 	};
 
 	SCM_fnc_fuzzifier = {
 		params["_fuzzyInput", "_ranges"];
 
+		#define HIGH 2
+		#define MID 1
+		#define LOW 0
+
 		_fuzzyInputApprox = "null";
 
 		if(_fuzzyInput <= _ranges select 1) then
 		{
-			_fuzzyInputApprox = "LOW";
+			_fuzzyInputApprox = LOW;
 		};
 		if(_fuzzyInput > _ranges select 1 && _fuzzyInput <= _ranges select 2) then
 		{
@@ -258,15 +306,15 @@ _aiSide = missionNamespace getVariable "_aiSide";
 			rndm = random 100;
 			if(rndm <= (low * 100)) then
 			{
-				_fuzzyInputApprox = "LOW";
+				_fuzzyInputApprox = LOW;
 			}
 			else{
-				_fuzzyInputApprox = "MID";
+				_fuzzyInputApprox = MID;
 			}
 		};
 		if(_fuzzyInput > _ranges select 2 && _fuzzyInput <= _ranges select 3) then
 		{
-			_fuzzyInputApprox = "MID";
+			_fuzzyInputApprox = MID;
 		};
 		if(_fuzzyInput > _ranges select 3 && _fuzzyInput <= _ranges select 4) then
 		{
@@ -277,15 +325,15 @@ _aiSide = missionNamespace getVariable "_aiSide";
 			rndm = random 100;
 			if(rndm <= (low * 100)) then
 			{
-				_fuzzyInputApprox = "MID";
+				_fuzzyInputApprox = MID;
 			}
 			else{
-				_fuzzyInputApprox = "HIGH";
+				_fuzzyInputApprox = HIGH;
 			}
 		};
 		if(_fuzzyInput > _ranges select 4) then
 		{
-				_fuzzyInputApprox = "HIGH";
+				_fuzzyInputApprox = HIGH;
 		};
 		_fuzzyInputApprox;
 	};
@@ -304,27 +352,21 @@ _aiSide = missionNamespace getVariable "_aiSide";
 
 		_knownBases = [_bases, _knownBases, _controlSquad, _targetObjects] call SCM_squadBaseKnowledge;
 
-		_squadSuppressed = _controlSquad getVariable "_isSuppressed";
+		_squadEngaged = _controlSquad getVariable "_isEngaged";
 		_unitsAlive = _controlSquad getVariable "_unitsAlive";
 		_unitsInjured = _controlSquad getVariable "_unitsInjured";
-		_groupMagazines = _controlSquad getVariable "_groupMagazines";
+		_squadMagazines = _controlSquad getVariable "_squadMagazines";
 
 		_squadSkill = [] call SCM_fnc_getSquadSkill;
 		_dayOrNight = [] call SCM_fnc_getDayOrNight;
 
-		[_groupMagazines, _unitsInjured, _knownBases, _squadSkill, _dayOrNight] call SCM_fnc_groupInaccuracies;
+		_inaccurateValues = [_controlSquad, _squadMagazines, _unitsInjured, _knownBases, _squadSkill, _dayOrNight, _squadEngaged, _args select 3] call SCM_fnc_squadInaccuracies;
 
-		//Prints for debugging and test purposes
-		//systemChat format ["Squad: %4. There are %1 soldiers left in the squad with %2 injured soldiers. They have %3 magazines on average", _unitsAlive, _unitsInjured, _groupMagazines, _controlSquad];
+		_controlSquad setVariable ["_processedSquadMagazines", _inaccurateValues select 1];
+		_controlSquad setVariable ["_processedUnitsInjured", _inaccurateValues select 2];
+		_controlSquad setVariable ["_processedKnownBases", _inaccurateValues select 3];
+		_controlSquad setVariable ["_processedSquadSkill", _inaccurateValues select 4];
 
-		if(_squadSuppressed) then 
-		{
-			//systemChat "squad is suppressed";
-			_controlSquad setVariable ["_isSuppressed", false];
-		}; 
-
-
-		missionNamespace setVariable ["_dayOrNight", [] call SCM_fnc_getDayOrNight];
 	};
 
 	//Set squad variables
@@ -332,11 +374,11 @@ _aiSide = missionNamespace getVariable "_aiSide";
 	_controlSquad setVariable ["_priority", "MEDIUM"]; //Sets default sqaud priority
 	_controlSquad setVariable ["_currentState", "START"]; //Sets default squad state
 	_controlSquad setVariable ["_squadSkill",[_controlSquad] call SCM_fnc_getSquadSkill];
-	_controlSquad setVariable ["_isSuppressed", false];
+	_controlSquad setVariable ["_isEngaged", false];
 
 	_knownBases = [];
 
 	//Calls query loop every two seconds
-	[SCM_fnc_queryLoop, _pollingRate, [_controlSquad, _baseTriggers, _knownBases]] call CBA_fnc_addPerFrameHandler;
+	[SCM_fnc_queryLoop, _pollingRate, [_controlSquad, _baseTriggers, _knownBases, _responseTime]] call CBA_fnc_addPerFrameHandler;
 
 } forEach groups _aiSide;
